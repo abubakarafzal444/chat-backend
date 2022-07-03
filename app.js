@@ -1,6 +1,8 @@
+require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
 const productsRoutes = require("./routes/products");
+const mongoose = require("mongoose");
 
 const app = express();
 
@@ -27,4 +29,10 @@ app.use((req, res, next) => {
 
 app.use(productsRoutes);
 
-app.listen(8080);
+mongoose
+  .connect(process.env.DB_CONNECTION_URL)
+  .then((result) => {
+    app.listen(8080);
+    console.log("connected to database");
+  })
+  .catch((e) => console.log("database conection failed", e));

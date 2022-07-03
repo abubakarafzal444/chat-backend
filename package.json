@@ -1,7 +1,7 @@
 {
-  "name": "inventory",
+  "name": "chat",
   "version": "1.0.0",
-  "description": "shop inventory system",
+  "description": "chat backend",
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -9,13 +9,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "inventory"
+    "url": "chat-backend"
   },
   "author": "Abubakar",
   "license": "ISC",
   "dependencies": {
     "body-parser": "^1.19.2",
-    "express": "^4.17.3"
+    "dotenv": "^16.0.1",
+    "express": "^4.17.3",
+    "express-validator": "^6.14.2",
+    "mongoose": "^6.4.2"
   },
   "devDependencies": {
     "nodemon": "^2.0.15"
