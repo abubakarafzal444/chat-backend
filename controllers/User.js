@@ -16,9 +16,10 @@ const signUp = async (req, res, next) => {
     const user = new User({ userName, password: hashed });
     const savedUser = await user.save();
     return res.status(201).json({
-      //   data: {
-      //     userName: savedUser,
-      //   },
+      data: {
+        userName: savedUser.userName,
+        id: savedUser._id,
+      },
       message: "New user has been added successfully",
     });
   } catch (error) {
