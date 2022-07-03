@@ -1,8 +1,16 @@
 const { body, validationResult } = require("express-validator");
 const User = require("../models/User");
 const validateSignUp = [
-  body("userName").trim().notEmpty().withMessage("Username cannot be empty!"),
-  body("password").trim().notEmpty().withMessage("Password cannot be empty!"),
+  body("userName")
+    .trim()
+    .notEmpty()
+    .isLength({ min: 5, max: 15 })
+    .withMessage("Username cannot be empty!"),
+  body("password")
+    .trim()
+    .notEmpty()
+    .isLength({ min: 5, max: 15 })
+    .withMessage("Password cannot be empty!"),
   body("confirmPassword")
     .trim()
     .notEmpty()

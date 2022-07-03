@@ -40,7 +40,7 @@ app.use((err, req, res, next) => {
   const message =
     err.message ||
     "Something went wrong on the server. Please try again later!";
-  return res.status(status).json({ message });
+  return res.status(status).json({ message: message });
 });
 
 mongoose

@@ -23,7 +23,7 @@ const Authenticate = (req, res, next) => {
         message: "Authentication failed. Please login to access this resource",
       });
     req.userName = decodedToken.userName;
-    req.id = decodedToken.id;
+    req._id = decodedToken._id;
     next();
   } catch (err) {
     next(err);
