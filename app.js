@@ -1,7 +1,10 @@
 require("dotenv").config();
 const express = require("express");
+
 const bodyParser = require("body-parser");
 const userRoutes = require("./routes/User");
+const SearchPeople = require("./routes/SearchPeople");
+
 const mongoose = require("mongoose");
 const multerMiddleware = require("./middlewares/multer-config");
 
@@ -33,6 +36,7 @@ app.use(multerMiddleware);
 
 app.use(userRoutes);
 
+app.use("/find-matches", SearchPeople);
 //central error handling
 app.use((err, req, res, next) => {
   console.log("error", err);
@@ -44,9 +48,14 @@ app.use((err, req, res, next) => {
 });
 
 mongoose
-  .connect(process.env.DB_CONNECTION_URL)
+  // .connect(process.env.DB_CONNECTION_URL)
+  .connect("mongodb://localhost:27017")
   .then((result) => {
-    app.listen(8080);
+    const server = app.listen(8080);
+    const io = require("./socket").init(server);
+    io.on("connection", (socket) => {
+      console.log("Client connected");
+    });
     console.log("connected to database");
   })
   .catch((e) => console.log("database conection failed", e));
