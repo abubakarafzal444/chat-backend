@@ -17,9 +17,16 @@ const topRated = async (req, res, next) => {
   }
 };
 
-// const loginUser = async (req, res, next) => {
-
-// };
+const userProfile = async (req, res, next) => {
+  const userId = req.params.id;
+  try {
+    const user = await User.findById(userId);
+    const { friends, isOnApp, password, ...data } = user;
+    return res.status(200).json(data);
+  } catch (error) {
+    next(error);
+  }
+};
 
 exports.topRated = topRated;
-// exports.login = loginUser;
+exports.userProfile = userProfile;
