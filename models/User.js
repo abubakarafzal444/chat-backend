@@ -19,7 +19,9 @@ const userSchema = new Schema(
     profileClicks: { type: Number, required: false },
     lastOnline: { type: Date, required: false },
     isOnApp: { type: Boolean, required: false },
-    friends: { type: Schema.Types.ObjectId, ref: "User" },
+    friendRequests: [{ type: Schema.Types.ObjectId, ref: "User" }],
+    sentRequests: [{ type: Schema.Types.ObjectId, ref: "User" }],
+    friends: [{ type: Schema.Types.ObjectId, ref: "User" }],
     //groups:{type:Schema.Types.ObjectId,ref:'Group'}
   },
   { timestamps: true }

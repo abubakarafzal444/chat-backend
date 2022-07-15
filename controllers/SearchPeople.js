@@ -1,9 +1,6 @@
 const User = require("../models/User");
-const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
 
 const topRated = async (req, res, next) => {
-  const { userName, password } = req.body;
   try {
     const users = await User.find()
       .limit(10)

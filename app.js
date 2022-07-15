@@ -4,12 +4,18 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const userRoutes = require("./routes/User");
 const SearchPeople = require("./routes/SearchPeople");
+const chats = require("./routes/Messages");
+const chatRoom = require("./routes/ChatRoom");
 
 const mongoose = require("mongoose");
 const multerMiddleware = require("./middlewares/multer-config");
 
 const app = express();
+const http = require("http");
+const { Server } = require("socket.io");
 
+const server = http.createServer(app);
+const io = new Server(server, { origin: "*" });
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader(
@@ -37,6 +43,11 @@ app.use(multerMiddleware);
 app.use(userRoutes);
 
 app.use("/find-matches", SearchPeople);
+
+app.use("/chats", chats);
+
+app.use(chatRoom);
+
 //central error handling
 app.use((err, req, res, next) => {
   console.log("error", err);
@@ -55,7 +66,23 @@ mongoose
     const io = require("./socket").init(server);
     io.on("connection", (socket) => {
       console.log("Client connected");
+
+      socket.on(`joinedRoom`, (data) => {
+        console.log("joined log");
+        console.log(data);
+        if (data.action === "JOINED-ROOM") {
+          socket.broadcast.emit(`roomJoined/${data.roomId}`, {
+            action: "PERSON_JOINED",
+            userName: data.userName,
+          });
+        }
+      });
     });
+
+    io.on("disconnect", (socket) => {
+      console.log("Client disconnected");
+    });
+
     console.log("connected to database");
   })
   .catch((e) => console.log("database conection failed", e));

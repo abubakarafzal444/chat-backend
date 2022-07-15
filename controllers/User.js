@@ -7,7 +7,7 @@ const signUp = async (req, res, next) => {
   const { userName, password } = req.body;
   try {
     const hashed = await bcrypt.hash(password, 12);
-    const user = new User({ userName, password: hashed, coins: 50 });
+    const user = new User({ userName, password: hashed });
     const savedUser = await user.save();
 
     const token = jwt.sign(
@@ -25,6 +25,7 @@ const signUp = async (req, res, next) => {
         _id: savedUser._id,
         tokenInfo: {
           token,
+          userId: savedUser._id,
           expiresOn: new Date(new Date().getTime() + 24 * 60 * 60 * 1000),
         },
       },
@@ -57,10 +58,118 @@ const loginUser = async (req, res, next) => {
       tokenInfo: {
         token,
         expiresOn: new Date(new Date().getTime() + 24 * 60 * 60 * 1000),
+        userId: dbUser._id,
       },
       message: "Logged in successfully!",
-      user: { userName: dbUser.userName },
+      user: { userName: dbUser.userName, _id: dbUser._id },
     });
+  } catch (e) {
+    next(e);
+  }
+};
+
+const getUserData = async (req, res, next) => {
+  try {
+    const user = await User.findById(req._id);
+    const { password, ...data } = user._doc;
+    return res.status(200).json(data);
+  } catch (e) {
+    next(e);
+  }
+};
+
+const sendFriendRequest = async (req, res, next) => {
+  const userId = req.params.userId;
+  try {
+    const myUser = await User.findByIdAndUpdate(
+      req._id,
+      { $push: { sentRequests: userId } },
+      { new: true, upsert: true }
+    );
+    await User.findByIdAndUpdate(
+      userId,
+      { $push: { friendRequests: req._id } },
+      { new: true, upsert: true }
+    );
+
+    const { password, ...data } = myUser._doc;
+    return res.status(201).json(data);
+  } catch (e) {
+    next(e);
+  }
+};
+
+const cancelRequest = async (req, res, next) => {
+  const userId = req.params.userId;
+  try {
+    const myUser = await User.findByIdAndUpdate(
+      req._id,
+      { $pull: { sentRequests: userId } },
+      { new: true }
+    );
+    await User.findByIdAndUpdate(
+      userId,
+      { $pull: { friendRequests: req._id } },
+      { new: true }
+    );
+    const { password, ...data } = myUser._doc;
+    return res.status(201).json(data);
+  } catch (e) {
+    next(e);
+  }
+};
+
+const acceptRequest = async (req, res, next) => {
+  const userId = req.params.userId;
+  try {
+    const myUser = await User.findByIdAndUpdate(
+      req._id,
+      { $pull: { friendRequests: userId }, $push: { friends: userId } },
+      { new: true }
+    );
+    await User.findByIdAndUpdate(
+      userId,
+      { $pull: { sentRequests: req._id }, $push: { friends: req._id } },
+      { new: true }
+    );
+    const { password, ...data } = myUser._doc;
+    return res.status(201).json(data);
+  } catch (e) {
+    next(e);
+  }
+};
+
+const unfriend = async (req, res, next) => {
+  const userId = req.params.userId;
+  try {
+    const myUser = await User.findByIdAndUpdate(
+      req._id,
+      { $pull: { friends: userId } },
+      { new: true }
+    );
+    await User.findByIdAndUpdate(
+      userId,
+      { $pull: { friends: req._id } },
+      { new: true }
+    );
+    const { password, ...data } = myUser._doc;
+    return res.status(201).json(data);
+  } catch (e) {
+    next(e);
+  }
+};
+
+const getUsersDataByIds = async (req, res, next) => {
+  const { idsArray } = req.body;
+  if (idsArray.length === 0) return res.status(200).json([]);
+  try {
+    const people = await User.find({
+      _id: {
+        $in: [...idsArray],
+      },
+    }).select("userName about gender prfilePhoto city  lastOnline");
+
+    return res.status(201).json(people);
   } catch (e) {
     next(e);
   }
@@ -68,3 +177,9 @@ const loginUser = async (req, res, next) => {
 
 exports.signUp = signUp;
 exports.login = loginUser;
+exports.sendFriendRequest = sendFriendRequest;
+exports.getUserData = getUserData;
+exports.cancelRequest = cancelRequest;
+exports.acceptRequest = acceptRequest;
+exports.unfriend = unfriend;
+exports.getUsersDataByIds = getUsersDataByIds;
