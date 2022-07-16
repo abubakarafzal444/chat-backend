@@ -100,6 +100,14 @@ io.on("connection", (socket) => {
         });
       } catch (e) {
         console.log(e);
+        socket.emit("chatRoomMessage", {
+          action: "SEND_ERROR",
+          message: {
+            message: data.message,
+            from: { _id: socket.userId },
+            to: { _id: data.roomId },
+          },
+        });
       }
     }
   });
@@ -152,12 +160,20 @@ io.on("connection", (socket) => {
             });
         }
         socket.emit("newPersonalMessage", {
-          action: "NEW_MESSAGE",
+          action: "MY_MESSAGE",
           message: populatedMessage,
         });
       }
     } catch (e) {
       console.log(e);
+      socket.emit("newPersonalMessage", {
+        action: "SEND_ERROR",
+        message: {
+          message: data.message,
+          from: { _id: socket.userId },
+          to: { _id: data.to },
+        },
+      });
     }
   });
 });
