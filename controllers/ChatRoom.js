@@ -36,6 +36,7 @@ const getTopRatedChatRooms = async (req, res, next) => {
 };
 
 const getGroupMessages = async (req, res, next) => {
+  console.log("getgroupmessages");
   const chatRoomId = req.params.chatRoomId;
   try {
     if (!ObjectId.isValid(chatRoomId)) throw new Error("not found");
@@ -43,6 +44,16 @@ const getGroupMessages = async (req, res, next) => {
     if (!roomExist) throw new Error("not found");
 
     const messages = await Message.find()
+      .populate("from", {
+        userName: 1,
+        email: 1,
+        bio: 1,
+        gender: 1,
+        prfilePhoto: 1,
+        city: 1,
+        country: 1,
+        lastOnline: 1,
+      })
       .where("to")
       .equals(chatRoomId)
       .sort({ timestamp: -1 })

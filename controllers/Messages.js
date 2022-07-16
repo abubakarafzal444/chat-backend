@@ -8,12 +8,26 @@ const getMessages = async (req, res, next) => {
     if (!ObjectId.isValid(user)) throw new Error("not found");
     const userExist = await User.exists({ _id: user });
     if (!userExist) throw new Error("not found");
+
     const messages = await Message.find({
       $or: [
         { from: user, to: req._id },
         { from: req._id, to: user },
       ],
-    }).sort({ timestamp: -1 });
+    })
+      .populate([
+        {
+          path: "from",
+          select:
+            "userName email bio gender profilePhoto city country lastOnline",
+        },
+        {
+          path: "to",
+          select:
+            "userName email bio gender profilePhoto city country lastOnline",
+        },
+      ])
+      .sort({ timestamp: -1 });
     return res.status(200).json(messages);
   } catch (error) {
     if (error.message === "not found") {

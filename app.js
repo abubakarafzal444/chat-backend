@@ -95,7 +95,7 @@ io.on("connection", (socket) => {
           message: populatedMessage,
         });
         socket.emit(`chatRoomMessage`, {
-          action: "NEW_MESSAGE",
+          action: "MY_MESSAGE",
           message: populatedMessage,
         });
       } catch (e) {
@@ -131,24 +131,7 @@ io.on("connection", (socket) => {
           }).sort({ timestamp: 1 });
           console.log(deletedMessage);
         }
-
-        // io.getIO().emit(`userMessage/${req._id}`, {
-        //   action: "NEW_MESSAGE",
-        //   message: savedMessage,
-        // });
-        const populatedMessage = await savedMessage.populate([
-          {
-            path: "from",
-            select:
-              "userName email bio gender profilePhoto city country lastOnline",
-          },
-          {
-            path: "to",
-            select:
-              "userName email bio gender profilePhoto city country lastOnline",
-          },
-        ]);
-        console.log("hmmm", connectedUsers[data.to]);
+        const populatedMessage = await savedMessage.q;
         if (connectedUsers[data.to]) {
           socket
             .to(connectedUsers[data.to].id)
@@ -192,6 +175,10 @@ app.use(bodyParser.json());
 //multer for file parsing
 app.use(multerMiddleware);
 
+app.use("/", (req, res) => {
+  return res.status(200).json({ message: "welcome to backend" });
+});
+
 app.use(userRoutes);
 
 app.use("/find-matches", SearchPeople);
@@ -215,22 +202,6 @@ mongoose
   // .connect("mongodb://localhost:27017")
   .then(() => {
     server.listen(process.env.PORT || 8080);
-    // const io = require("./socket").init(server);
-    // io.on("connection", (socket) => {
-    //   console.log("Client connected");
-
-    //   socket.on(`joinedRoom`, (data) => {
-    //     console.log("joined log");
-    //     console.log(data);
-    //     if (data.action === "JOINED-ROOM") {
-    //       socket.broadcast.emit(`roomJoined/${data.roomId}`, {
-    //         action: "PERSON_JOINED",
-    //         userName: data.userName,
-    //       });
-    //     }
-    //   });
-    // });
-
     console.log("connected to database");
   })
   .catch((e) => console.log("database conection failed", e));
