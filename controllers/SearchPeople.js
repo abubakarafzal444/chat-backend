@@ -1,4 +1,5 @@
 const User = require("../models/User");
+var ObjectId = require("mongoose").Types.ObjectId;
 
 const topRated = async (req, res, next) => {
   try {
@@ -17,11 +18,17 @@ const topRated = async (req, res, next) => {
 const userProfile = async (req, res, next) => {
   const userId = req.params.id;
   try {
+    if (!ObjectId.isValid(userId)) throw new Error("not found");
+    const userExist = await User.exists({ _id: userId });
+    if (!userExist) throw new Error("not found");
+
     const user = await User.findById(userId);
     const { friends, isOnApp, password, ...data } = user;
     return res.status(200).json(data);
   } catch (error) {
-    next(error);
+    if (error.message === "not found") {
+      return res.status(404).json({ message: "No data found for this url" });
+    } else next(error);
   }
 };
 

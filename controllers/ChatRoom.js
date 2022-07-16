@@ -1,6 +1,6 @@
 const ChatRoom = require("../models/ChatRoom");
 const Message = require("../models/Message");
-const io = require("../socket");
+var ObjectId = require("mongoose").Types.ObjectId;
 
 const createChatRoom = async (req, res, next) => {
   const { name } = req.body;
@@ -35,47 +35,13 @@ const getTopRatedChatRooms = async (req, res, next) => {
   }
 };
 
-const sendGroupMessage = async (req, res, next) => {
-  const { message } = req.body;
-  const receiver = req.params.chatRoomId;
-  try {
-    const messageObj = new Message({ from: req._id, to: receiver, message });
-    const savedMessage = await messageObj.save();
-
-    const populatedMessage = await savedMessage.populate("from", {
-      userName: 1,
-      email: 1,
-      bio: 1,
-      gender: 1,
-      prfilePhoto: 1,
-      city: 1,
-      country: 1,
-      lastOnline: 1,
-    });
-
-    io.getIO().emit(`chatRoomMessage/${receiver}`, {
-      action: "NEW_MESSAGE",
-      message: populatedMessage,
-    });
-
-    // io.getIO().on(`joinedRoom`, (data) => {
-    //   console.log("joined log");
-    //   if (data.action === "JOINED-ROOM") {
-    //     io.getIO().emit(`roomJoined/${data.roomId}`, {
-    //       action: "PERSON_JOINED",
-    //       userName: data.userName,
-    //     });
-    //   }
-    // });
-    return res.status(201).json(savedMessage);
-  } catch (error) {
-    next(error);
-  }
-};
-
 const getGroupMessages = async (req, res, next) => {
   const chatRoomId = req.params.chatRoomId;
   try {
+    if (!ObjectId.isValid(chatRoomId)) throw new Error("not found");
+    const roomExist = await ChatRoom.exists({ _id: chatRoomId });
+    if (!roomExist) throw new Error("not found");
+
     const messages = await Message.find()
       .where("to")
       .equals(chatRoomId)
@@ -83,11 +49,12 @@ const getGroupMessages = async (req, res, next) => {
       .limit(50);
     return res.status(200).json(messages);
   } catch (error) {
-    next(error);
+    if (error.message === "not found") {
+      return res.status(404).json({ message: "No data found for this url" });
+    } else next(error);
   }
 };
 
 exports.createChatRoom = createChatRoom;
 exports.getTopRatedChatRooms = getTopRatedChatRooms;
 exports.getGroupMessages = getGroupMessages;
-exports.sendGroupMessage = sendGroupMessage;
