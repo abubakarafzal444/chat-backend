@@ -1,54 +1,13 @@
 const Message = require("../models/Message");
-const io = require("../socket");
-
-const userMessage = async (req, res, next) => {
-  const { message } = req.body;
-  const receiver = req.params.userId;
-  try {
-    const messageObj = new Message({ from: req._id, to: receiver, message });
-    const savedMessage = await messageObj.save();
-
-    const messagesCount = await Message.find({
-      $or: [
-        { from: req._id, to: receiver },
-        { from: receiver, to: req._id },
-      ],
-    }).countDocuments();
-
-    if (messagesCount > 20) {
-      const deletedMessage = await Message.findOneAndDelete({
-        $or: [
-          { from: req._id, to: receiver },
-          { from: receiver, to: req._id },
-        ],
-      }).sort({ timestamp: 1 });
-      console.log(deletedMessage);
-    }
-    io.getIO().emit(`userMessage/${req._id}`, {
-      action: "NEW_MESSAGE",
-      message: savedMessage,
-    });
-    const populatedMessage = await savedMessage.populate([
-      {
-        path: "from",
-        select:
-          "userName email bio gender profilePhoto city country lastOnline",
-      },
-      {
-        path: "to",
-        select:
-          "userName email bio gender profilePhoto city country lastOnline",
-      },
-    ]);
-    return res.status(200).json(populatedMessage);
-  } catch (error) {
-    next(error);
-  }
-};
+const User = require("../models/User");
+var ObjectId = require("mongoose").Types.ObjectId;
 
 const getMessages = async (req, res, next) => {
   const user = req.params.userId;
   try {
+    if (!ObjectId.isValid(user)) throw new Error("not found");
+    const userExist = await User.exists({ _id: user });
+    if (!userExist) throw new Error("not found");
     const messages = await Message.find({
       $or: [
         { from: user, to: req._id },
@@ -57,9 +16,10 @@ const getMessages = async (req, res, next) => {
     }).sort({ timestamp: -1 });
     return res.status(200).json(messages);
   } catch (error) {
-    next(error);
+    if (error.message === "not found") {
+      return res.status(404).json({ message: "No data found for this url" });
+    } else next(error);
   }
 };
 
-exports.userMessage = userMessage;
 exports.getMessages = getMessages;
