@@ -131,7 +131,18 @@ io.on("connection", (socket) => {
           }).sort({ timestamp: 1 });
           console.log(deletedMessage);
         }
-        const populatedMessage = await savedMessage.q;
+        const populatedMessage = await savedMessage.populate([
+          {
+            path: "from",
+            select:
+              "userName email bio gender profilePhoto city country lastOnline",
+          },
+          {
+            path: "to",
+            select:
+              "userName email bio gender profilePhoto city country lastOnline",
+          },
+        ]);
         if (connectedUsers[data.to]) {
           socket
             .to(connectedUsers[data.to].id)
@@ -140,7 +151,7 @@ io.on("connection", (socket) => {
               message: populatedMessage,
             });
         }
-        socket.emit(`newPersonalMessage`, {
+        socket.emit("newPersonalMessage", {
           action: "NEW_MESSAGE",
           message: populatedMessage,
         });
