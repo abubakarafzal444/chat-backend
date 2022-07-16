@@ -54,9 +54,7 @@ const getMessages = async (req, res, next) => {
         { from: user, to: req._id },
         { from: req._id, to: user },
       ],
-    })
-      .sort({ timestamp: -1 })
-      .limit(20);
+    }).sort({ timestamp: -1 });
     return res.status(200).json(messages);
   } catch (error) {
     next(error);

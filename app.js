@@ -74,7 +74,7 @@ io.on("connection", (socket) => {
       console.log("new message in room");
 
       const messageObj = new Message({
-        from: data.userId,
+        from: socket.userId,
         to: data.roomId,
         message: data.message,
       });
@@ -95,6 +95,66 @@ io.on("connection", (socket) => {
         message: populatedMessage,
       });
       socket.emit(`chatRoomMessage`, {
+        action: "NEW_MESSAGE",
+        message: populatedMessage,
+      });
+    }
+  });
+
+  socket.on("sendingPersonalMsg", async (data) => {
+    if (data.message.trim().length > 0) {
+      console.log("new message in chat");
+
+      const messageObj = new Message({
+        from: socket.userId,
+        to: data.to,
+        message: data.message,
+      });
+      const savedMessage = await messageObj.save();
+
+      const messagesCount = await Message.find({
+        $or: [
+          { from: socket.userId, to: data.to },
+          { from: data.to, to: socket.userId },
+        ],
+      }).countDocuments();
+
+      if (messagesCount > 20) {
+        const deletedMessage = await Message.findOneAndDelete({
+          $or: [
+            { from: socket.userId, to: data.to },
+            { from: data.to, to: socket.userId },
+          ],
+        }).sort({ timestamp: 1 });
+        console.log(deletedMessage);
+      }
+
+      // io.getIO().emit(`userMessage/${req._id}`, {
+      //   action: "NEW_MESSAGE",
+      //   message: savedMessage,
+      // });
+      const populatedMessage = await savedMessage.populate([
+        {
+          path: "from",
+          select:
+            "userName email bio gender profilePhoto city country lastOnline",
+        },
+        {
+          path: "to",
+          select:
+            "userName email bio gender profilePhoto city country lastOnline",
+        },
+      ]);
+      console.log("hmmm", connectedUsers[data.to]);
+      if (connectedUsers[data.to]) {
+        socket
+          .to(connectedUsers[data.to].id)
+          .emit(`newPersonalMessage/${socket.userId}`, {
+            action: "NEW_MESSAGE",
+            message: populatedMessage,
+          });
+      }
+      socket.emit(`newPersonalMessage`, {
         action: "NEW_MESSAGE",
         message: populatedMessage,
       });
@@ -145,8 +205,8 @@ app.use((err, req, res, next) => {
 });
 
 mongoose
-  // .connect(process.env.DB_CONNECTION_URL)
-  .connect("mongodb://localhost:27017")
+  .connect(process.env.DB_CONNECTION_URL)
+  // .connect("mongodb://localhost:27017")
   .then(() => {
     server.listen(8080);
     // const io = require("./socket").init(server);
