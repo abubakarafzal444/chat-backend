@@ -175,10 +175,6 @@ app.use(bodyParser.json());
 //multer for file parsing
 app.use(multerMiddleware);
 
-app.use("/", (req, res) => {
-  return res.status(200).json({ message: "welcome to backend" });
-});
-
 app.use(userRoutes);
 
 app.use("/find-matches", SearchPeople);
@@ -186,6 +182,10 @@ app.use("/find-matches", SearchPeople);
 app.use("/chats", chats);
 
 app.use(chatRoom);
+
+app.use("/", (req, res) => {
+  return res.status(200).json({ message: "welcome to backend" });
+});
 
 //central error handling
 app.use((err, req, res, next) => {
