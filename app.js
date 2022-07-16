@@ -1,21 +1,107 @@
 require("dotenv").config();
 const express = require("express");
-
+const app = express();
+const http = require("http");
+const { Server } = require("socket.io");
+const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
+const cors = require("cors");
+app.use(cors());
+const jwt = require("jsonwebtoken");
+
 const userRoutes = require("./routes/User");
 const SearchPeople = require("./routes/SearchPeople");
 const chats = require("./routes/Messages");
 const chatRoom = require("./routes/ChatRoom");
-
-const mongoose = require("mongoose");
 const multerMiddleware = require("./middlewares/multer-config");
-
-const app = express();
-const http = require("http");
-const { Server } = require("socket.io");
+const Message = require("./models/Message");
 
 const server = http.createServer(app);
-const io = new Server(server, { origin: "*" });
+
+var connectedUsers = {};
+
+const io = new Server(server, {
+  allowEIO3: true,
+  cors: {
+    origin: true,
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+});
+
+io.use((socket, next) => {
+  try {
+    const token = socket.handshake.query.token;
+    const tokenObj = JSON.parse(token);
+    const payload = jwt.verify(tokenObj.token, process.env.JWT_DECODE_STRING);
+    if (!payload) throw new Error("authentication failed");
+    socket.userId = payload._id;
+    socket.userName = payload.userName;
+    next();
+  } catch (err) {
+    console.log(err);
+  }
+});
+
+io.on("connection", (socket) => {
+  console.log("client connected", socket.userId);
+  connectedUsers[socket.userId] = socket;
+  socket.on("disconnect", () => {
+    console.log("Client disconnected", socket.userId);
+    delete connectedUsers.userId;
+    console.log("active users", Object.keys(connectedUsers).length);
+  });
+  socket.on("joinedRoom", (data) => {
+    if (data.action === "JOINED-ROOM") socket.join(data.roomId);
+    console.log(data.userName, "joined chatroom: " + data.roomId);
+    socket.to(data.roomId).emit(`roomJoined/${data.roomId}`, {
+      action: "PERSON_JOINED",
+      userName: data.userName,
+    });
+  });
+
+  socket.on("leftRoom", (data) => {
+    if (data.action === "LEFT-ROOM") socket.leave(data.roomId);
+    console.log(data.userName, "left chatroom: " + data.roomId);
+    socket.to(data.roomId).emit(`roomLeft/${data.roomId}`, {
+      action: "PERSON_LEFT",
+      userName: data.userName,
+    });
+  });
+
+  socket.on("sendingNewMsg", async (data) => {
+    if (data.message.trim().length > 0) {
+      console.log("new message in room");
+
+      const messageObj = new Message({
+        from: data.userId,
+        to: data.roomId,
+        message: data.message,
+      });
+      const savedMessage = await messageObj.save();
+
+      const populatedMessage = await savedMessage.populate("from", {
+        userName: 1,
+        email: 1,
+        bio: 1,
+        gender: 1,
+        prfilePhoto: 1,
+        city: 1,
+        country: 1,
+        lastOnline: 1,
+      });
+      socket.to(data.roomId).emit(`chatRoomMessage`, {
+        action: "NEW_MESSAGE",
+        message: populatedMessage,
+      });
+      socket.emit(`chatRoomMessage`, {
+        action: "NEW_MESSAGE",
+        message: populatedMessage,
+      });
+    }
+  });
+});
+
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader(
@@ -61,28 +147,26 @@ app.use((err, req, res, next) => {
 mongoose
   // .connect(process.env.DB_CONNECTION_URL)
   .connect("mongodb://localhost:27017")
-  .then((result) => {
-    const server = app.listen(8080);
-    const io = require("./socket").init(server);
-    io.on("connection", (socket) => {
-      console.log("Client connected");
+  .then(() => {
+    server.listen(8080);
+    // const io = require("./socket").init(server);
+    // io.on("connection", (socket) => {
+    //   console.log("Client connected");
 
-      socket.on(`joinedRoom`, (data) => {
-        console.log("joined log");
-        console.log(data);
-        if (data.action === "JOINED-ROOM") {
-          socket.broadcast.emit(`roomJoined/${data.roomId}`, {
-            action: "PERSON_JOINED",
-            userName: data.userName,
-          });
-        }
-      });
-    });
-
-    io.on("disconnect", (socket) => {
-      console.log("Client disconnected");
-    });
+    //   socket.on(`joinedRoom`, (data) => {
+    //     console.log("joined log");
+    //     console.log(data);
+    //     if (data.action === "JOINED-ROOM") {
+    //       socket.broadcast.emit(`roomJoined/${data.roomId}`, {
+    //         action: "PERSON_JOINED",
+    //         userName: data.userName,
+    //       });
+    //     }
+    //   });
+    // });
 
     console.log("connected to database");
   })
   .catch((e) => console.log("database conection failed", e));
+
+module.exports = server;
