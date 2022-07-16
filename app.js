@@ -208,7 +208,7 @@ mongoose
   .connect(process.env.DB_CONNECTION_URL)
   // .connect("mongodb://localhost:27017")
   .then(() => {
-    server.listen(8080);
+    server.listen(process.env.PORT || 8080);
     // const io = require("./socket").init(server);
     // io.on("connection", (socket) => {
     //   console.log("Client connected");
