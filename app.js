@@ -72,92 +72,98 @@ io.on("connection", (socket) => {
   socket.on("sendingNewMsg", async (data) => {
     if (data.message.trim().length > 0) {
       console.log("new message in room");
+      try {
+        const messageObj = new Message({
+          from: socket.userId,
+          to: data.roomId,
+          message: data.message,
+        });
+        const savedMessage = await messageObj.save();
 
-      const messageObj = new Message({
-        from: socket.userId,
-        to: data.roomId,
-        message: data.message,
-      });
-      const savedMessage = await messageObj.save();
-
-      const populatedMessage = await savedMessage.populate("from", {
-        userName: 1,
-        email: 1,
-        bio: 1,
-        gender: 1,
-        prfilePhoto: 1,
-        city: 1,
-        country: 1,
-        lastOnline: 1,
-      });
-      socket.to(data.roomId).emit(`chatRoomMessage`, {
-        action: "NEW_MESSAGE",
-        message: populatedMessage,
-      });
-      socket.emit(`chatRoomMessage`, {
-        action: "NEW_MESSAGE",
-        message: populatedMessage,
-      });
+        const populatedMessage = await savedMessage.populate("from", {
+          userName: 1,
+          email: 1,
+          bio: 1,
+          gender: 1,
+          prfilePhoto: 1,
+          city: 1,
+          country: 1,
+          lastOnline: 1,
+        });
+        socket.to(data.roomId).emit(`chatRoomMessage`, {
+          action: "NEW_MESSAGE",
+          message: populatedMessage,
+        });
+        socket.emit(`chatRoomMessage`, {
+          action: "NEW_MESSAGE",
+          message: populatedMessage,
+        });
+      } catch (e) {
+        console.log(e);
+      }
     }
   });
 
   socket.on("sendingPersonalMsg", async (data) => {
-    if (data.message.trim().length > 0) {
-      console.log("new message in chat");
+    try {
+      if (data.message.trim().length > 0) {
+        console.log("new message in chat");
+        const messageObj = new Message({
+          from: socket.userId,
+          to: data.to,
+          message: data.message,
+        });
+        const savedMessage = await messageObj.save();
 
-      const messageObj = new Message({
-        from: socket.userId,
-        to: data.to,
-        message: data.message,
-      });
-      const savedMessage = await messageObj.save();
-
-      const messagesCount = await Message.find({
-        $or: [
-          { from: socket.userId, to: data.to },
-          { from: data.to, to: socket.userId },
-        ],
-      }).countDocuments();
-
-      if (messagesCount > 20) {
-        const deletedMessage = await Message.findOneAndDelete({
+        const messagesCount = await Message.find({
           $or: [
             { from: socket.userId, to: data.to },
             { from: data.to, to: socket.userId },
           ],
-        }).sort({ timestamp: 1 });
-        console.log(deletedMessage);
-      }
+        }).countDocuments();
 
-      // io.getIO().emit(`userMessage/${req._id}`, {
-      //   action: "NEW_MESSAGE",
-      //   message: savedMessage,
-      // });
-      const populatedMessage = await savedMessage.populate([
-        {
-          path: "from",
-          select:
-            "userName email bio gender profilePhoto city country lastOnline",
-        },
-        {
-          path: "to",
-          select:
-            "userName email bio gender profilePhoto city country lastOnline",
-        },
-      ]);
-      console.log("hmmm", connectedUsers[data.to]);
-      if (connectedUsers[data.to]) {
-        socket
-          .to(connectedUsers[data.to].id)
-          .emit(`newPersonalMessage/${socket.userId}`, {
-            action: "NEW_MESSAGE",
-            message: populatedMessage,
-          });
+        if (messagesCount > 20) {
+          const deletedMessage = await Message.findOneAndDelete({
+            $or: [
+              { from: socket.userId, to: data.to },
+              { from: data.to, to: socket.userId },
+            ],
+          }).sort({ timestamp: 1 });
+          console.log(deletedMessage);
+        }
+
+        // io.getIO().emit(`userMessage/${req._id}`, {
+        //   action: "NEW_MESSAGE",
+        //   message: savedMessage,
+        // });
+        const populatedMessage = await savedMessage.populate([
+          {
+            path: "from",
+            select:
+              "userName email bio gender profilePhoto city country lastOnline",
+          },
+          {
+            path: "to",
+            select:
+              "userName email bio gender profilePhoto city country lastOnline",
+          },
+        ]);
+        console.log("hmmm", connectedUsers[data.to]);
+        if (connectedUsers[data.to]) {
+          socket
+            .to(connectedUsers[data.to].id)
+            .emit(`newPersonalMessage/${socket.userId}`, {
+              action: "NEW_MESSAGE",
+              message: populatedMessage,
+            });
+        }
+        socket.emit(`newPersonalMessage`, {
+          action: "NEW_MESSAGE",
+          message: populatedMessage,
+        });
       }
-      socket.emit(`newPersonalMessage`, {
-        action: "NEW_MESSAGE",
-        message: populatedMessage,
-      });
+    } catch (e) {
+      console.log(e);
     }
   });
 });
