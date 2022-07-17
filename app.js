@@ -52,7 +52,7 @@ io.on("connection", async (socket) => {
   try {
     const userObj = await User.findById(socket.userId);
     let onlineFriendsArr = [];
-    userObj.friends.forEach((f) => {
+    userObj?.friends?.forEach((f) => {
       if (connectedUsers[f]) {
         onlineFriendsArr.push(connectedUsers[f].id);
       }
