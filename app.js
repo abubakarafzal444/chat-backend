@@ -362,8 +362,8 @@ app.use((err, req, res, next) => {
 });
 
 mongoose
-  //.connect(process.env.DB_CONNECTION_URL)
-  .connect("mongodb://localhost:27017")
+  .connect(process.env.DB_CONNECTION_URL)
+  //.connect("mongodb://localhost:27017")
   .then(() => {
     server.listen(process.env.PORT || 8080);
     console.log("connected to database");
