@@ -15,6 +15,7 @@ const chats = require("./routes/Messages");
 const chatRoom = require("./routes/ChatRoom");
 const multerMiddleware = require("./middlewares/multer-config");
 const Message = require("./models/Message");
+const User = require("./models/User");
 
 const server = http.createServer(app);
 
@@ -45,10 +46,12 @@ io.use((socket, next) => {
 
 io.on("connection", (socket) => {
   console.log("client connected", socket.userId);
-  connectedUsers[socket.userId] = socket;
+  connectedUsers[socket.userId] = socket.id;
+  User.findByIdAndUpdate(socket.userId, { lastOnline: "online" });
   socket.on("disconnect", () => {
     console.log("Client disconnected", socket.userId);
     delete connectedUsers.userId;
+    User.findByIdAndUpdate(socket.userId, { lastOnline: new Date() });
     console.log("active users", Object.keys(connectedUsers).length);
   });
   socket.on("joinedRoom", (data) => {
@@ -153,7 +156,7 @@ io.on("connection", (socket) => {
         ]);
         if (connectedUsers[data.to]) {
           socket
-            .to(connectedUsers[data.to].id)
+            .to(connectedUsers[data.to])
             .emit(`newPersonalMessage/${socket.userId}`, {
               action: "NEW_MESSAGE",
               message: populatedMessage,

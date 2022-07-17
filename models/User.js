@@ -17,7 +17,7 @@ const userSchema = new Schema(
     lookingFor: { type: String, required: false },
     interests: { type: Array, required: false },
     profileClicks: { type: Number, required: false },
-    lastOnline: { type: Date, required: false },
+    lastOnline: { type: String, required: false },
     isOnApp: { type: Boolean, required: false },
     friendRequests: [{ type: Schema.Types.ObjectId, ref: "User" }],
     sentRequests: [{ type: Schema.Types.ObjectId, ref: "User" }],
