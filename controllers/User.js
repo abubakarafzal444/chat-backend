@@ -4,9 +4,9 @@ const bcrypt = require("bcryptjs");
 const customError = require("../util/customError");
 
 const signUp = async (req, res, next) => {
-  const { userName, password } = req.body;
+  const { userName, password: pass } = req.body;
   try {
-    const hashed = await bcrypt.hash(password, 12);
+    const hashed = await bcrypt.hash(pass, 12);
     const user = new User({ userName, password: hashed });
     const savedUser = await user.save();
 
@@ -18,11 +18,10 @@ const signUp = async (req, res, next) => {
       process.env.JWT_DECODE_STRING,
       { expiresIn: "1d" }
     );
-
+    const { password, ...savedUserData } = savedUser._doc;
     return res.status(201).json({
       data: {
-        userName: savedUser.userName,
-        _id: savedUser._id,
+        user: savedUserData,
         tokenInfo: {
           token,
           userId: savedUser._id,
@@ -54,6 +53,7 @@ const loginUser = async (req, res, next) => {
       process.env.JWT_DECODE_STRING,
       { expiresIn: "1d" }
     );
+    const { password, ...userData } = dbUser._doc;
     return res.status(200).json({
       tokenInfo: {
         token,
@@ -61,7 +61,7 @@ const loginUser = async (req, res, next) => {
         userId: dbUser._id,
       },
       message: "Logged in successfully!",
-      user: { userName: dbUser.userName, _id: dbUser._id },
+      user: userData,
     });
   } catch (e) {
     next(e);

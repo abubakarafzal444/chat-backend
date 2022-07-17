@@ -44,16 +44,129 @@ io.use((socket, next) => {
   }
 });
 
-io.on("connection", (socket) => {
+io.on("connection", async (socket) => {
   console.log("client connected", socket.userId);
-  connectedUsers[socket.userId] = socket.id;
-  User.findByIdAndUpdate(socket.userId, { lastOnline: "online" });
-  socket.on("disconnect", () => {
-    console.log("Client disconnected", socket.userId);
-    delete connectedUsers.userId;
-    User.findByIdAndUpdate(socket.userId, { lastOnline: new Date() });
-    console.log("active users", Object.keys(connectedUsers).length);
+  connectedUsers[socket.userId] = socket;
+  console.log("connected", connectedUsers);
+  //online status for friends
+  try {
+    const userObj = await User.findById(socket.userId);
+    let onlineFriendsArr = [];
+    userObj.friends.forEach((f) => {
+      if (connectedUsers[f]) {
+        onlineFriendsArr.push(connectedUsers[f].id);
+      }
+    });
+    socket.to(onlineFriendsArr).emit(`friendOnlineStatus`, {
+      action: "FRIEND_ONLINE",
+      userId: socket.userId,
+    });
+    userObj.lastOnline = "online";
+    await userObj.save();
+    // await User.findByIdAndUpdate(socket.userId, {
+    //   lastOnline: "online",
+    // });
+    const messages = await Message.find({ to: socket.userId, status: "sent" });
+    messages.forEach((m) => {
+      if (connectedUsers[m.from]) {
+        socket.to(connectedUsers[m.from].id).emit(`messageDelivered`, {
+          action: "MESSAGE_DELIVERED",
+          message: m,
+          userId: m.to,
+        });
+      }
+    });
+    const textedUsersMessages = await Message.find({
+      to: socket.userId,
+      status: "sent",
+    });
+    let onlineTextedUsers = [];
+    textedUsersMessages.forEach((m) => {
+      if (connectedUsers[m.from]) {
+        onlineTextedUsers.push(connectedUsers[m.from].id);
+      }
+    });
+    if (onlineTextedUsers.length > 0) {
+      socket.to(onlineTextedUsers).emit("messageBeingDelivered", {
+        userId: socket.userId,
+      });
+    }
+    console.log("textedUsersMessages", textedUsersMessages);
+    //todo
+
+    await Message.updateMany(
+      { to: socket.userId, status: "sent" },
+      { status: "delivered" }
+    );
+
+    console.log(
+      "active users after connect",
+      Object.keys(connectedUsers).length
+    );
+  } catch (e) {
+    console.log(e);
+  }
+  socket.on("disconnect", async () => {
+    try {
+      console.log("Client disconnected", socket.userId);
+
+      delete connectedUsers[socket.userId];
+
+      console.log("disconnected", connectedUsers);
+
+      const userObj = await User.findById(socket.userId);
+
+      let onlineFriendsArr = [];
+      userObj.friends.forEach((f) => {
+        if (connectedUsers[f]) {
+          onlineFriendsArr.push(connectedUsers[f].id);
+        }
+      });
+      socket.to(onlineFriendsArr).emit(`friendOnlineStatus`, {
+        action: "FRIEND_OFFLINE",
+        userId: socket.userId,
+      });
+
+      userObj.lastOnline = new Date().toString();
+      await userObj.save();
+      // await User.findByIdAndUpdate(socket.userId, {
+      //   lastOnline: new Date().toString(),
+      // });
+      console.log(
+        "active users after disconnect",
+        Object.keys(connectedUsers).length
+      );
+    } catch (e) {
+      console.log(e);
+    }
   });
+
+  socket.on("openedChat", async (data) => {
+    try {
+      socket.join(data.userId);
+      console.log("opened chat");
+      if (connectedUsers[data.userId]?.id) {
+        socket
+          .to(connectedUsers[data.userId]?.id)
+          .emit("messageBeingRead", { userId: socket.userId });
+      }
+      await Message.updateMany(
+        {
+          from: data.userId,
+          to: socket.userId,
+          status: "delivered",
+        },
+        { status: "read" }
+      );
+    } catch (e) {
+      console.log(e);
+    }
+  });
+  socket.on("closedChat", (data) => {
+    socket.leave(data.userId);
+    console.log("closed chat");
+  });
+
   socket.on("joinedRoom", (data) => {
     if (data.action === "JOINED-ROOM") socket.join(data.roomId);
     console.log(data.userName, "joined chatroom: " + data.roomId);
@@ -74,7 +187,6 @@ io.on("connection", (socket) => {
 
   socket.on("sendingNewMsg", async (data) => {
     if (data.message.trim().length > 0) {
-      console.log("new message in room");
       try {
         const messageObj = new Message({
           from: socket.userId,
@@ -82,6 +194,16 @@ io.on("connection", (socket) => {
           message: data.message,
         });
         const savedMessage = await messageObj.save();
+
+        const messagesCount = await Message.find({
+          to: data.roomId,
+        }).countDocuments();
+
+        if (messagesCount > 1000) {
+          const deletedMessage = await Message.findOneAndDelete({
+            to: data.roomId,
+          }).sort({ timestamp: 1 });
+        }
 
         const populatedMessage = await savedMessage.populate("from", {
           userName: 1,
@@ -119,29 +241,24 @@ io.on("connection", (socket) => {
     try {
       if (data.message.trim().length > 0) {
         console.log("new message in chat");
+        let status = "sent";
+        const recieverSocket = connectedUsers[data.to];
+
+        if (recieverSocket) {
+          console.log("rooms", recieverSocket.rooms);
+          if (recieverSocket.rooms.has(socket.userId)) status = "read";
+          else status = "delivered";
+        }
+
+        // if (socket.rooms.hasOwnProperty()) status = "read";
         const messageObj = new Message({
           from: socket.userId,
           to: data.to,
           message: data.message,
+          status,
         });
         const savedMessage = await messageObj.save();
 
-        const messagesCount = await Message.find({
-          $or: [
-            { from: socket.userId, to: data.to },
-            { from: data.to, to: socket.userId },
-          ],
-        }).countDocuments();
-
-        if (messagesCount > 20) {
-          const deletedMessage = await Message.findOneAndDelete({
-            $or: [
-              { from: socket.userId, to: data.to },
-              { from: data.to, to: socket.userId },
-            ],
-          }).sort({ timestamp: 1 });
-          console.log(deletedMessage);
-        }
         const populatedMessage = await savedMessage.populate([
           {
             path: "from",
@@ -156,7 +273,7 @@ io.on("connection", (socket) => {
         ]);
         if (connectedUsers[data.to]) {
           socket
-            .to(connectedUsers[data.to])
+            .to(connectedUsers[data.to].id)
             .emit(`newPersonalMessage/${socket.userId}`, {
               action: "NEW_MESSAGE",
               message: populatedMessage,
@@ -166,6 +283,22 @@ io.on("connection", (socket) => {
           action: "MY_MESSAGE",
           message: populatedMessage,
         });
+        //
+        const messagesCount = await Message.find({
+          $or: [
+            { from: socket.userId, to: data.to },
+            { from: data.to, to: socket.userId },
+          ],
+        }).countDocuments();
+
+        if (messagesCount > 20) {
+          const deletedMessage = await Message.findOneAndDelete({
+            $or: [
+              { from: socket.userId, to: data.to },
+              { from: data.to, to: socket.userId },
+            ],
+          }).sort({ timestamp: 1 });
+        }
       }
     } catch (e) {
       console.log(e);
@@ -175,6 +308,7 @@ io.on("connection", (socket) => {
           message: data.message,
           from: { _id: socket.userId },
           to: { _id: data.to },
+          status: "Error",
         },
       });
     }
@@ -228,8 +362,8 @@ app.use((err, req, res, next) => {
 });
 
 mongoose
-  .connect(process.env.DB_CONNECTION_URL)
-  // .connect("mongodb://localhost:27017")
+  //.connect(process.env.DB_CONNECTION_URL)
+  .connect("mongodb://localhost:27017")
   .then(() => {
     server.listen(process.env.PORT || 8080);
     console.log("connected to database");
